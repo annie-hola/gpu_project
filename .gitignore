@@ -1,0 +1,56 @@
+# .gitignore for MNIST CUDA MLP Project
+
+# Compiled Object files
+*.o
+*.obj
+*.slo
+*.lo
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+*.lai
+*.la
+
+# Executables
+*.exe
+*.out
+*.app
+bin/mnist_mlp
+bin/*
+
+# Build directories
+build/
+build/*
+
+# MNIST dataset files
+data/*.gz
+data/train-images-idx3-ubyte
+data/train-labels-idx1-ubyte
+data/t10k-images-idx3-ubyte
+data/t10k-labels-idx1-ubyte
+data/*.ubyte
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# CUDA profiling files
+*.nvvp
+*.qdrep
+*.sqlite
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
