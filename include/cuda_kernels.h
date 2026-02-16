@@ -29,6 +29,8 @@ __global__ void relu_backward_kernel(float *grad_output, float *hidden,
 __global__ void matmul_transpose_kernel(float *A, float *B, float *C,
                                         int M, int N, int K, bool transpose_A, bool transpose_B);
 
+__global__ void sum_columns_kernel(float *input, float *output, int rows, int cols);
+
 // Weight Update Kernels (SGD)
 __global__ void sgd_update_kernel(float *weights, float *gradients,
                                   float learning_rate, int size, int batch_size);

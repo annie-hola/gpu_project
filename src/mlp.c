@@ -233,7 +233,6 @@ float mlp_compute_loss_cpu(MLP *mlp, int *labels, int batch_size) {
 }
 
 int mlp_predict_cpu(MLP *mlp, float *input) {
-    // TODO: Forward pass and return argmax of output
     mlp_forward_cpu(mlp, input, 1);
     
     // Find argmax
@@ -284,7 +283,6 @@ void mlp_train_cpu(MLP *mlp, float *train_data, int *train_labels,
 }
 
 float mlp_evaluate_cpu(MLP *mlp, float *test_data, int *test_labels, int num_samples) {
-    // TODO: Evaluate accuracy on test set
     int correct = 0;
     
     for (int i = 0; i < num_samples; i++) {

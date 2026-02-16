@@ -1,5 +1,6 @@
 #include "cuda_kernels.h"
 #include <stdio.h>
+#include <math.h>
 
 // ==================== FORWARD PROPAGATION KERNELS ====================
 
@@ -14,8 +15,7 @@ __global__ void matmul_kernel(float *A, float *B, float *C, int M, int N, int K)
     if (row < M && col < N) {
         float sum = 0.0f;
         for (int k = 0; k < K; k++) {
-            // TODO: Compute dot product
-            // sum += A[row * K + k] * B[k * N + col];
+            sum += A[row * K + k] * B[k * N + col];
         }
         C[row * N + col] = sum;
     }
@@ -37,10 +37,28 @@ __global__ void matmul_tiled_kernel(float *A, float *B, float *C, int M, int N, 
     
     // Loop over tiles
     for (int t = 0; t < (K + TILE_SIZE - 1) / TILE_SIZE; t++) {
-        // TODO: Load tiles into shared memory
-        // TODO: Synchronize threads
-        // TODO: Compute partial dot product
-        // TODO: Synchronize again
+        int tiled_col = t * TILE_SIZE + threadIdx.x;
+        int tiled_row = t * TILE_SIZE + threadIdx.y;
+
+        if (row < M && tiled_col < K) {
+            As[threadIdx.y][threadIdx.x] = A[row * K + tiled_col];
+        } else {
+            As[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        if (tiled_row < K && col < N) {
+            Bs[threadIdx.y][threadIdx.x] = B[tiled_row * N + col];
+        } else {
+            Bs[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        __syncthreads();
+
+        for (int k = 0; k < TILE_SIZE; k++) {
+            sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
+        }
+
+        __syncthreads();
     }
     
     if (row < M && col < N) {
@@ -76,10 +94,27 @@ __global__ void softmax_kernel(float *input, float *output, int batch_size, int 
     
     int batch_idx = blockIdx.x;
     if (batch_idx >= batch_size) return;
-    
-    // TODO: Find max value for this sample
-    // TODO: Compute exp and sum
-    // TODO: Normalize
+
+    if (threadIdx.x == 0) {
+        float *row = &input[batch_idx * num_classes];
+
+        float max_val = row[0];
+        for (int i = 1; i < num_classes; i++) {
+            if (row[i] > max_val) max_val = row[i];
+        }
+
+        float sum = 0.0f;
+        for (int i = 0; i < num_classes; i++) {
+            float v = expf(row[i] - max_val);
+            output[batch_idx * num_classes + i] = v;
+            sum += v;
+        }
+
+        float inv_sum = 1.0f / sum;
+        for (int i = 0; i < num_classes; i++) {
+            output[batch_idx * num_classes + i] *= inv_sum;
+        }
+    }
 }
 
 // ==================== BACKWARD PROPAGATION KERNELS ====================
@@ -94,7 +129,11 @@ __global__ void softmax_cross_entropy_gradient_kernel(float *output, int *labels
     int class_idx = idx % num_classes;
     
     if (batch_idx < batch_size && class_idx < num_classes) {
-        // TODO: Implement gradient computation
+        float grad = output[idx];
+        if (class_idx == labels[batch_idx]) {
+            grad -= 1.0f;
+        }
+        grad_output[idx] = grad;
     }
 }
 
@@ -112,8 +151,29 @@ __global__ void relu_backward_kernel(float *grad_output, float *hidden,
 __global__ void matmul_transpose_kernel(float *A, float *B, float *C,
                                         int M, int N, int K,
                                         bool transpose_A, bool transpose_B) {
-    // TODO: Implement matrix multiply with optional transpose
-    // Useful for computing gradients: dW = X^T @ dL
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < M && col < N) {
+        float sum = 0.0f;
+        for (int k = 0; k < K; k++) {
+            float a_val = transpose_A ? A[k * M + row] : A[row * K + k];
+            float b_val = transpose_B ? B[col * K + k] : B[k * N + col];
+            sum += a_val * b_val;
+        }
+        C[row * N + col] = sum;
+    }
+}
+
+__global__ void sum_columns_kernel(float *input, float *output, int rows, int cols) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    if (col < cols) {
+        float sum = 0.0f;
+        for (int row = 0; row < rows; row++) {
+            sum += input[row * cols + col];
+        }
+        output[col] = sum;
+    }
 }
 
 // ==================== OPTIMIZATION KERNELS ====================

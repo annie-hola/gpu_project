@@ -213,8 +213,6 @@ CUDA_ARCH = -arch=sm_75
 CUDA_ARCH = -arch=sm_61
 ```
 
-Check your GPU's compute capability: [NVIDIA GPU Compute Capability](https://developer.nvidia.com/cuda-gpus)
-
 ## Implementation Status
 
 ### Completed (Skeleton)
