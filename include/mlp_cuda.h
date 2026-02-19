@@ -24,6 +24,11 @@ typedef struct {
     
     // Temporary buffers
     float *d_temp;
+
+    // Batch capacities for dynamic buffers
+    int io_batch_capacity;
+    int act_batch_capacity;
+    int grad_batch_capacity;
 } MLPCuda;
 
 // GPU Implementation Functions

@@ -4,6 +4,48 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 
+static void ensure_io_buffers(MLPCuda *mlp, int batch_size) {
+    if (mlp->io_batch_capacity >= batch_size) {
+        return;
+    }
+
+    if (mlp->d_input) CUDA_CHECK(cudaFree(mlp->d_input));
+    if (mlp->d_labels) CUDA_CHECK(cudaFree(mlp->d_labels));
+
+    CUDA_CHECK(cudaMalloc(&mlp->d_input, batch_size * mlp->config.input_size * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&mlp->d_labels, batch_size * sizeof(int)));
+
+    mlp->io_batch_capacity = batch_size;
+}
+
+static void ensure_activation_buffers(MLPCuda *mlp, int batch_size) {
+    if (mlp->act_batch_capacity >= batch_size) {
+        return;
+    }
+
+    if (mlp->d_hidden) CUDA_CHECK(cudaFree(mlp->d_hidden));
+    if (mlp->d_output) CUDA_CHECK(cudaFree(mlp->d_output));
+
+    CUDA_CHECK(cudaMalloc(&mlp->d_hidden, batch_size * mlp->config.hidden_size * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&mlp->d_output, batch_size * mlp->config.output_size * sizeof(float)));
+
+    mlp->act_batch_capacity = batch_size;
+}
+
+static void ensure_grad_buffers(MLPCuda *mlp, int batch_size) {
+    if (mlp->grad_batch_capacity >= batch_size) {
+        return;
+    }
+
+    if (mlp->d_dhidden) CUDA_CHECK(cudaFree(mlp->d_dhidden));
+    if (mlp->d_temp) CUDA_CHECK(cudaFree(mlp->d_temp));
+
+    CUDA_CHECK(cudaMalloc(&mlp->d_dhidden, batch_size * mlp->config.hidden_size * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&mlp->d_temp, batch_size * mlp->config.output_size * sizeof(float)));
+
+    mlp->grad_batch_capacity = batch_size;
+}
+
 MLPCuda* mlp_create_cuda(MLPConfig config) {
     MLPCuda *mlp = (MLPCuda*)malloc(sizeof(MLPCuda));
     mlp->config = config;
@@ -27,6 +69,10 @@ MLPCuda* mlp_create_cuda(MLPConfig config) {
     CUDA_CHECK(cudaMalloc(&mlp->d_db2, config.output_size * sizeof(float)));
     mlp->d_dhidden = NULL;
     mlp->d_temp = NULL;
+
+    mlp->io_batch_capacity = 0;
+    mlp->act_batch_capacity = 0;
+    mlp->grad_batch_capacity = 0;
     
     return mlp;
 }
@@ -86,11 +132,7 @@ void mlp_copy_weights_to_host(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
 void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
     MLPConfig cfg = mlp->config;
     
-    // Allocate intermediate buffers if needed
-    if (!mlp->d_hidden) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_hidden, batch_size * cfg.hidden_size * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&mlp->d_output, batch_size * cfg.output_size * sizeof(float)));
-    }
+    ensure_activation_buffers(mlp, batch_size);
     
     // Define grid and block dimensions
     dim3 blockDim(16, 16);
@@ -127,13 +169,7 @@ void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
 void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_size) {
     MLPConfig cfg = mlp->config;
 
-    if (!mlp->d_dhidden) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_dhidden, batch_size * cfg.hidden_size * sizeof(float)));
-    }
-
-    if (!mlp->d_temp) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_temp, batch_size * cfg.output_size * sizeof(float)));
-    }
+    ensure_grad_buffers(mlp, batch_size);
 
     // 1. Compute output gradient (softmax + cross-entropy derivative)
     int total = batch_size * cfg.output_size;
@@ -150,7 +186,6 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
     
     int threads_1d = 256;
     int blocks_1d = (cfg.output_size + threads_1d - 1) / threads_1d;
-    int blocks_2d = (cfg.hidden_size * cfg.output_size + threads_1d - 1) / threads_1d;
     
     CUDA_CHECK(cudaMemset(mlp->d_dW2, 0, cfg.hidden_size * cfg.output_size * sizeof(float)));
     CUDA_CHECK(cudaMemset(mlp->d_db2, 0, cfg.output_size * sizeof(float)));
@@ -180,9 +215,6 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
     // 5. Compute dW1 and db1
     dim3 gridDim3((cfg.hidden_size + blockDim.x - 1) / blockDim.x,
                   (cfg.input_size + blockDim.y - 1) / blockDim.y);
-    
-    int blocks_dw1 = (cfg.input_size * cfg.hidden_size + threads_1d - 1) / threads_1d;
-    int blocks_db1 = (cfg.hidden_size + threads_1d - 1) / threads_1d;
     
     CUDA_CHECK(cudaMemset(mlp->d_dW1, 0, cfg.input_size * cfg.hidden_size * sizeof(float)));
     CUDA_CHECK(cudaMemset(mlp->d_db1, 0, cfg.hidden_size * sizeof(float)));
@@ -228,10 +260,7 @@ void mlp_update_weights_cuda(MLPCuda *mlp, int batch_size) {
 
 float mlp_compute_loss_cuda(MLPCuda *mlp, int *d_labels, int batch_size) {
     MLPConfig cfg = mlp->config;
-
-    if (!mlp->d_temp) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_temp, batch_size * cfg.output_size * sizeof(float)));
-    }
+    ensure_grad_buffers(mlp, batch_size);
 
     float *d_loss = NULL;
     CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
@@ -256,11 +285,7 @@ void mlp_train_cuda(MLPCuda *mlp, float *train_data, int *train_labels,
     
     printf("Training MLP on GPU...\n");
     
-    // Allocate device memory for input batch
-    if (!mlp->d_input) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_input, batch_size * mlp->config.input_size * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&mlp->d_labels, batch_size * sizeof(int)));
-    }
+    ensure_io_buffers(mlp, batch_size);
     
     Timer timer;
     
@@ -300,10 +325,8 @@ float mlp_evaluate_cuda(MLPCuda *mlp, float *test_data, int *test_labels, int nu
         batch_size = num_samples;
     }
 
-    if (!mlp->d_input) {
-        CUDA_CHECK(cudaMalloc(&mlp->d_input, batch_size * mlp->config.input_size * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&mlp->d_labels, batch_size * sizeof(int)));
-    }
+    ensure_io_buffers(mlp, batch_size);
+    ensure_activation_buffers(mlp, batch_size);
 
     int *d_correct = NULL;
     CUDA_CHECK(cudaMalloc(&d_correct, sizeof(int)));
