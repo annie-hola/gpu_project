@@ -147,14 +147,19 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
     dim3 blockDim(16, 16);
     dim3 gridDim((cfg.output_size + blockDim.x - 1) / blockDim.x,
                  (cfg.hidden_size + blockDim.y - 1) / blockDim.y);
+    
+    int threads_1d = 256;
+    int blocks_1d = (cfg.output_size + threads_1d - 1) / threads_1d;
+    int blocks_2d = (cfg.hidden_size * cfg.output_size + threads_1d - 1) / threads_1d;
+    
+    CUDA_CHECK(cudaMemset(mlp->d_dW2, 0, cfg.hidden_size * cfg.output_size * sizeof(float)));
+    CUDA_CHECK(cudaMemset(mlp->d_db2, 0, cfg.output_size * sizeof(float)));
+    
     matmul_transpose_kernel<<<gridDim, blockDim>>>(mlp->d_hidden, mlp->d_temp,
                                                    mlp->d_dW2,
                                                    cfg.hidden_size, cfg.output_size,
                                                    batch_size, true, false);
 
-    int threads_1d = 256;
-    int blocks_1d = (cfg.output_size + threads_1d - 1) / threads_1d;
-    CUDA_CHECK(cudaMemset(mlp->d_db2, 0, cfg.output_size * sizeof(float)));
     sum_columns_kernel<<<blocks_1d, threads_1d>>>(mlp->d_temp, mlp->d_db2,
                                             batch_size, cfg.output_size);
 
@@ -175,13 +180,18 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
     // 5. Compute dW1 and db1
     dim3 gridDim3((cfg.hidden_size + blockDim.x - 1) / blockDim.x,
                   (cfg.input_size + blockDim.y - 1) / blockDim.y);
+    
+    int blocks_dw1 = (cfg.input_size * cfg.hidden_size + threads_1d - 1) / threads_1d;
+    int blocks_db1 = (cfg.hidden_size + threads_1d - 1) / threads_1d;
+    
+    CUDA_CHECK(cudaMemset(mlp->d_dW1, 0, cfg.input_size * cfg.hidden_size * sizeof(float)));
+    CUDA_CHECK(cudaMemset(mlp->d_db1, 0, cfg.hidden_size * sizeof(float)));
+    
     matmul_transpose_kernel<<<gridDim3, blockDim>>>(d_input, mlp->d_dhidden,
                                                     mlp->d_dW1,
                                                     cfg.input_size, cfg.hidden_size,
                                                     batch_size, true, false);
 
-    blocks_1d = (cfg.hidden_size + threads_1d - 1) / threads_1d;
-    CUDA_CHECK(cudaMemset(mlp->d_db1, 0, cfg.hidden_size * sizeof(float)));
     sum_columns_kernel<<<blocks_1d, threads_1d>>>(mlp->d_dhidden, mlp->d_db1,
                                             batch_size, cfg.hidden_size);
 }
