@@ -84,22 +84,12 @@ void mlp_copy_weights_to_host(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
 }
 
 void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
-    // TODO: Implement GPU forward propagation using CUDA kernels
-    // 1. Matrix multiply: d_hidden = d_input @ d_W1
-    // 2. Add bias: d_hidden += d_b1
-    // 3. ReLU activation
-    // 4. Matrix multiply: d_output = d_hidden @ d_W2
-    // 5. Add bias: d_output += d_b2
-    // 6. Softmax
-    
     MLPConfig cfg = mlp->config;
     
     // Allocate intermediate buffers if needed
     if (!mlp->d_hidden) {
         CUDA_CHECK(cudaMalloc(&mlp->d_hidden, batch_size * cfg.hidden_size * sizeof(float)));
         CUDA_CHECK(cudaMalloc(&mlp->d_output, batch_size * cfg.output_size * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&mlp->d_dhidden, batch_size * cfg.hidden_size * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&mlp->d_temp, batch_size * cfg.output_size * sizeof(float)));
     }
     
     // Define grid and block dimensions
@@ -162,8 +152,10 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
                                                    cfg.hidden_size, cfg.output_size,
                                                    batch_size, true, false);
 
-    blocks = (cfg.output_size + threads - 1) / threads;
-    sum_columns_kernel<<<blocks, threads>>>(mlp->d_temp, mlp->d_db2,
+    int threads_1d = 256;
+    int blocks_1d = (cfg.output_size + threads_1d - 1) / threads_1d;
+    CUDA_CHECK(cudaMemset(mlp->d_db2, 0, cfg.output_size * sizeof(float)));
+    sum_columns_kernel<<<blocks_1d, threads_1d>>>(mlp->d_temp, mlp->d_db2,
                                             batch_size, cfg.output_size);
 
     // 3. Backprop to hidden layer: dhidden = doutput @ W2^T
@@ -188,8 +180,9 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
                                                     cfg.input_size, cfg.hidden_size,
                                                     batch_size, true, false);
 
-    blocks = (cfg.hidden_size + threads - 1) / threads;
-    sum_columns_kernel<<<blocks, threads>>>(mlp->d_dhidden, mlp->d_db1,
+    blocks_1d = (cfg.hidden_size + threads_1d - 1) / threads_1d;
+    CUDA_CHECK(cudaMemset(mlp->d_db1, 0, cfg.hidden_size * sizeof(float)));
+    sum_columns_kernel<<<blocks_1d, threads_1d>>>(mlp->d_dhidden, mlp->d_db1,
                                             batch_size, cfg.hidden_size);
 }
 
@@ -230,16 +223,19 @@ float mlp_compute_loss_cuda(MLPCuda *mlp, int *d_labels, int batch_size) {
         CUDA_CHECK(cudaMalloc(&mlp->d_temp, batch_size * cfg.output_size * sizeof(float)));
     }
 
-    CUDA_CHECK(cudaMemset(mlp->d_temp, 0, sizeof(float)));
+    float *d_loss = NULL;
+    CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
+    CUDA_CHECK(cudaMemset(d_loss, 0, sizeof(float)));
 
     int threads = 256;
     int blocks = (batch_size + threads - 1) / threads;
     cross_entropy_loss_kernel<<<blocks, threads>>>(mlp->d_output, d_labels,
-                                                   mlp->d_temp,
+                                                   d_loss,
                                                    batch_size, cfg.output_size);
 
     float loss = 0.0f;
-    CUDA_CHECK(cudaMemcpy(&loss, mlp->d_temp, sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaFree(d_loss));
     return loss / batch_size;
 }
 

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "mlp.h"
-// #include "mlp_cuda.h" // NOTE: Uncomment when implementing GPU part
+#include "mlp_cuda.h"
 #include "mnist_loader.h"
 #include "utils.h"
 
@@ -63,11 +63,10 @@ int main(int argc, char **argv) {
     printf("  Learning Rate: %.4f\n", learning_rate);
     printf("  Data Directory: %s\n\n", data_dir);
     
-    // NOTE: GPU part is commented out for now
     // Print GPU information if using GPU
-    // if (strcmp(mode, "gpu") == 0 || strcmp(mode, "both") == 0) {
-    //     cuda_print_device_info();
-    // }
+    if (strcmp(mode, "gpu") == 0 || strcmp(mode, "both") == 0) {
+        cuda_print_device_info();
+    }
     
     // Load MNIST dataset
     printf("Loading MNIST dataset...\n");
@@ -124,42 +123,41 @@ int main(int argc, char **argv) {
         mlp_destroy_cpu(mlp_cpu);
     }
     
-    // NOTE: GPU part is commented out for now
     // ==================== GPU TRAINING ====================
-    // if (strcmp(mode, "gpu") == 0 || strcmp(mode, "both") == 0) {
-    //     printf("\n========== GPU Training ==========\n");
+    if (strcmp(mode, "gpu") == 0 || strcmp(mode, "both") == 0) {
+        printf("\n========== GPU Training ==========\n");
         
-    //     MLPCuda *mlp_gpu = mlp_create_cuda(config);
+        MLPCuda *mlp_gpu = mlp_create_cuda(config);
         
-    //     // Initialize weights (same as CPU for fair comparison)
-    //     if (strcmp(mode, "both") == 0) {
-    //         MLP *mlp_temp = mlp_create_cpu(config);
-    //         mlp_copy_weights_to_device(mlp_gpu, mlp_temp);
-    //         mlp_destroy_cpu(mlp_temp);
-    //     } else {
-    //         // Create temporary CPU model just for initialization
-    //         MLP *mlp_temp = mlp_create_cpu(config);
-    //         mlp_copy_weights_to_device(mlp_gpu, mlp_temp);
-    //         mlp_destroy_cpu(mlp_temp);
-    //     }
+        // Initialize weights (same as CPU for fair comparison)
+        if (strcmp(mode, "both") == 0) {
+            MLP *mlp_temp = mlp_create_cpu(config);
+            mlp_copy_weights_to_device(mlp_gpu, mlp_temp);
+            mlp_destroy_cpu(mlp_temp);
+        } else {
+            // Create temporary CPU model just for initialization
+            MLP *mlp_temp = mlp_create_cpu(config);
+            mlp_copy_weights_to_device(mlp_gpu, mlp_temp);
+            mlp_destroy_cpu(mlp_temp);
+        }
         
-    //     Timer timer;
-    //     timer_start(&timer);
+        Timer timer;
+        timer_start(&timer);
         
-    //     mlp_train_cuda(mlp_gpu, train_data->images, train_data->labels,
-    //                   train_data->num_images, batch_size, epochs);
+        mlp_train_cuda(mlp_gpu, train_data->images, train_data->labels,
+                      train_data->num_images, batch_size, epochs);
         
-    //     double total_time = timer_stop(&timer);
-    //     printf("Total GPU training time: %.2f ms (%.2f s)\n", total_time, total_time / 1000.0);
+        double total_time = timer_stop(&timer);
+        printf("Total GPU training time: %.2f ms (%.2f s)\n", total_time, total_time / 1000.0);
         
-    //     // Evaluate on test set
-    //     printf("\nEvaluating on test set...\n");
-    //     float gpu_accuracy = mlp_evaluate_cuda(mlp_gpu, test_data->images,
-    //                                            test_data->labels, test_data->num_images);
-    //     printf("GPU Test Accuracy: %.2f%%\n", gpu_accuracy * 100);
+        // Evaluate on test set
+        printf("\nEvaluating on test set...\n");
+        float gpu_accuracy = mlp_evaluate_cuda(mlp_gpu, test_data->images,
+                                               test_data->labels, test_data->num_images);
+        printf("GPU Test Accuracy: %.2f%%\n", gpu_accuracy * 100);
         
-    //     mlp_destroy_cuda(mlp_gpu);
-    // }
+        mlp_destroy_cuda(mlp_gpu);
+    }
     
     // ==================== PERFORMANCE COMPARISON ====================
     if (strcmp(mode, "both") == 0) {
