@@ -1,7 +1,8 @@
-# MNIST MLP Training - CPU Only
-# Makefile for building CPU-only version (no CUDA required)
+# MNIST MLP Training with CUDA
+# Makefile for building CPU and GPU implementations
 
 # Compiler and flags
+NVCC = nvcc
 CC = gcc
 CXX = g++
 
@@ -12,21 +13,30 @@ BUILD_DIR = build
 BIN_DIR = bin
 DATA_DIR = data
 
-# Compiler flags (CPU)
-CC_FLAGS = -O3 -Wall -I$(INC_DIR)
+# CUDA flags
+CUDA_ARCH = -arch=sm_75  # Adjust based on your GPU (e.g., sm_86 for RTX 30xx)
+NVCC_FLAGS = -O3 $(CUDA_ARCH) -I$(INC_DIR) -Xcompiler -Wall
+CC_FLAGS = -O3 -Wall -I$(INC_DIR) -lm
 
 # Target executable
 TARGET = $(BIN_DIR)/mnist_mlp
 
-# Source files (CPU-only)
-C_SOURCES = $(SRC_DIR)/main.cu \
-            $(SRC_DIR)/mlp.c \
-            $(SRC_DIR)/mnist_loader.c \
-            $(SRC_DIR)/utils_cpu.c
+# Source files
+CUDA_SOURCES = $(SRC_DIR)/main.cu \
+               $(SRC_DIR)/mlp_cuda.cu \
+               $(SRC_DIR)/cuda_kernels.cu \
+               $(SRC_DIR)/utils.cu
+
+C_SOURCES = $(SRC_DIR)/mlp.c \
+            $(SRC_DIR)/mnist_loader.c
 
 # Object files
-C_OBJECTS = $(patsubst $(SRC_DIR)/%.cu, $(BUILD_DIR)/%.o, $(filter %.cu, $(C_SOURCES))) \
-            $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(filter %.c, $(C_SOURCES)))
+CUDA_OBJECTS = $(patsubst $(SRC_DIR)/%.cu, $(BUILD_DIR)/%.o, $(CUDA_SOURCES))
+C_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(C_SOURCES))
+
+ALL_OBJECTS = $(CUDA_OBJECTS) $(C_OBJECTS)
+
+ALL_OBJECTS = $(CUDA_OBJECTS) $(C_OBJECTS)
 
 # Default target
 .PHONY: all
@@ -40,32 +50,38 @@ directories:
 	@mkdir -p $(DATA_DIR)
 
 # Link all object files
-$(TARGET): $(C_OBJECTS)
+$(TARGET): $(ALL_OBJECTS)
 	@echo "Linking $@..."
-	$(CC) -o $@ $^ $(CC_FLAGS) -lm
+	$(NVCC) $(NVCC_FLAGS) -o $@ $^
 	@echo "Build complete: $@"
 
-# Compile .cu files as C (ignoring CUDA code)
+# Compile CUDA source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cu
-	@echo "Compiling $< (as C)..."
-	$(CC) -x c $(CC_FLAGS) -c $< -o $@
+	@echo "Compiling $<..."
+	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
-# Compile C source files
+# Compile C source files with nvcc (for compatibility)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo "Compiling $<..."
-	$(CC) $(CC_FLAGS) -c $< -o $@
+	$(NVCC) $(NVCC_FLAGS) -x cu -c $< -o $@
 
-# Run the program with default settings
+# Run the program with default settings (both CPU and GPU)
 .PHONY: run
-run: all
-	@echo "Running MNIST MLP training (CPU)..."
+run: $(TARGET)
+	@echo "Running MNIST MLP training (CPU + GPU)..."
+	./$(TARGET) --mode both --epochs 10 --batch-size 64
+
+# Run CPU-only version
+.PHONY: run-cpu
+run-cpu: $(TARGET)
+	@echo "Running CPU-only training..."
 	./$(TARGET) --mode cpu --epochs 10 --batch-size 64
 
-# Run with custom epochs
-.PHONY: run-train
-run-train: all
-	@echo "Training MLP..."
-	./$(TARGET) --mode cpu --epochs 5 --batch-size 128
+# Run GPU-only version
+.PHONY: run-gpu
+run-gpu: $(TARGET)
+	@echo "Running GPU-only training..."
+	./$(TARGET) --mode gpu --epochs 10 --batch-size 64
 
 # Download MNIST dataset (requires wget or curl)
 .PHONY: download-data
@@ -97,6 +113,64 @@ clean:
 	@rm -rf $(BUILD_DIR)/*.o
 	@rm -f $(TARGET)
 	@echo "Clean complete."
+
+# Deep clean (including directories)
+.PHONY: distclean
+distclean: clean
+	@echo "Deep cleaning..."
+	@rm -rf $(BUILD_DIR)
+	@rm -rf $(BIN_DIR)
+	@echo "Deep clean complete."
+
+# Run benchmarks with different batch sizes
+.PHONY: benchmark
+benchmark: $(TARGET)
+	@echo "Running benchmarks..."
+	@echo "\n=== Batch Size 32 ==="
+	./$(TARGET) --mode both --epochs 5 --batch-size 32
+	@echo "\n=== Batch Size 64 ==="
+	./$(TARGET) --mode both --epochs 5 --batch-size 64
+	@echo "\n=== Batch Size 128 ==="
+	./$(TARGET) --mode both --epochs 5 --batch-size 128
+	@echo "\n=== Batch Size 256 ==="
+	./$(TARGET) --mode both --epochs 5 --batch-size 256
+
+# Check CUDA installation
+.PHONY: check-cuda
+check-cuda:
+	@echo "Checking CUDA installation..."
+	@which nvcc || echo "nvcc not found! Please install CUDA toolkit."
+	@nvcc --version || echo "Cannot run nvcc."
+	@nvidia-smi || echo "nvidia-smi not found! Check GPU driver installation."
+
+# Display help
+.PHONY: help
+help:
+	@echo "MNIST MLP CUDA Project - Makefile Help"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make                 - Build the project"
+	@echo "  make run             - Build and run with both CPU and GPU"
+	@echo "  make run-cpu         - Build and run CPU-only version"
+	@echo "  make run-gpu         - Build and run GPU-only version"
+	@echo "  make download-data   - Download MNIST dataset"
+	@echo "  make benchmark       - Run performance benchmarks"
+	@echo "  make clean           - Remove build artifacts"
+	@echo "  make distclean       - Remove all generated files"
+	@echo "  make check-cuda      - Check CUDA installation"
+	@echo "  make help            - Display this help message"
+	@echo ""
+	@echo "Customization:"
+	@echo "  Adjust CUDA_ARCH in Makefile for your GPU architecture"
+	@echo "  Use command-line args: ./$(TARGET) --help"
+
+# Dependencies (header files)
+$(BUILD_DIR)/main.o: $(INC_DIR)/mlp.h $(INC_DIR)/mlp_cuda.h $(INC_DIR)/mnist_loader.h $(INC_DIR)/utils.h
+$(BUILD_DIR)/mlp.o: $(INC_DIR)/mlp.h $(INC_DIR)/utils.h
+$(BUILD_DIR)/mlp_cuda.o: $(INC_DIR)/mlp_cuda.h $(INC_DIR)/cuda_kernels.h $(INC_DIR)/utils.h
+$(BUILD_DIR)/cuda_kernels.o: $(INC_DIR)/cuda_kernels.h
+$(BUILD_DIR)/mnist_loader.o: $(INC_DIR)/mnist_loader.h
+$(BUILD_DIR)/utils.o: $(INC_DIR)/utils.h
 
 # Deep clean (including data)
 .PHONY: distclean
