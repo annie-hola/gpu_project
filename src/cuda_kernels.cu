@@ -121,7 +121,6 @@ __global__ void softmax_cross_entropy_gradient_kernel(float *output, int *labels
     int batch_idx = idx / num_classes;
     int class_idx = idx % num_classes;
     
-    float grad = 0.0f; // default gradient 
     if (batch_idx < batch_size && class_idx < num_classes) {
         float grad = output[idx];
         if (class_idx == labels[batch_idx]) {
