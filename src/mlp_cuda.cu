@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 
+// ==================== MEMORY MANAGEMENT ====================
+
+// Ensure input and label buffers are allocated for the given batch size
 static void ensure_io_buffers(MLPCuda *mlp, int batch_size) {
     if (mlp->io_batch_capacity >= batch_size) {
         return;
@@ -18,6 +21,7 @@ static void ensure_io_buffers(MLPCuda *mlp, int batch_size) {
     mlp->io_batch_capacity = batch_size;
 }
 
+// Ensure activation buffers are allocated for the given batch size
 static void ensure_activation_buffers(MLPCuda *mlp, int batch_size) {
     if (mlp->act_batch_capacity >= batch_size) {
         return;
@@ -32,6 +36,7 @@ static void ensure_activation_buffers(MLPCuda *mlp, int batch_size) {
     mlp->act_batch_capacity = batch_size;
 }
 
+// Ensure gradient buffers are allocated for the given batch size
 static void ensure_grad_buffers(MLPCuda *mlp, int batch_size) {
     if (mlp->grad_batch_capacity >= batch_size) {
         return;
@@ -46,6 +51,7 @@ static void ensure_grad_buffers(MLPCuda *mlp, int batch_size) {
     mlp->grad_batch_capacity = batch_size;
 }
 
+// Create and initialize MLP on GPU
 MLPCuda* mlp_create_cuda(MLPConfig config) {
     MLPCuda *mlp = (MLPCuda*)malloc(sizeof(MLPCuda));
     mlp->config = config;
@@ -77,6 +83,7 @@ MLPCuda* mlp_create_cuda(MLPConfig config) {
     return mlp;
 }
 
+// Free GPU memory and destroy MLP
 void mlp_destroy_cuda(MLPCuda *mlp) {
     cudaFree(mlp->d_W1);
     cudaFree(mlp->d_b1);
@@ -95,8 +102,10 @@ void mlp_destroy_cuda(MLPCuda *mlp) {
     free(mlp);
 }
 
+// ==================== UTILITY FUNCTIONS ====================
+
+// Copy weights from CPU to GPU
 void mlp_copy_weights_to_device(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
-    // TODO: Copy weights from CPU to GPU
     MLPConfig cfg = mlp_cuda->config;
     CUDA_CHECK(cudaMemcpy(mlp_cuda->d_W1, mlp_cpu->W1, 
                          cfg.input_size * cfg.hidden_size * sizeof(float),
@@ -112,8 +121,8 @@ void mlp_copy_weights_to_device(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
                          cudaMemcpyHostToDevice));
 }
 
+// Copy weights from GPU to CPU (for evaluation or debugging)
 void mlp_copy_weights_to_host(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
-    // TODO: Copy weights from GPU to CPU
     MLPConfig cfg = mlp_cuda->config;
     CUDA_CHECK(cudaMemcpy(mlp_cpu->W1, mlp_cuda->d_W1,
                          cfg.input_size * cfg.hidden_size * sizeof(float),
@@ -129,6 +138,9 @@ void mlp_copy_weights_to_host(MLPCuda *mlp_cuda, MLP *mlp_cpu) {
                          cudaMemcpyDeviceToHost));
 }
 
+// ==================== FORWARD AND BACKWARD FUNCTIONS ====================
+
+// Forward pass
 void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
     MLPConfig cfg = mlp->config;
     
@@ -166,6 +178,7 @@ void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
                                       batch_size, cfg.output_size);
 }
 
+// Backward pass
 void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_size) {
     MLPConfig cfg = mlp->config;
 
@@ -228,6 +241,7 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
                                             batch_size, cfg.hidden_size);
 }
 
+// Update weights using SGD
 void mlp_update_weights_cuda(MLPCuda *mlp, int batch_size) {
     MLPConfig cfg = mlp->config;
     int threadsPerBlock = 256;
@@ -258,6 +272,7 @@ void mlp_update_weights_cuda(MLPCuda *mlp, int batch_size) {
                                                       batch_size);
 }
 
+// Compute loss (cross-entropy)
 float mlp_compute_loss_cuda(MLPCuda *mlp, int *d_labels, int batch_size) {
     MLPConfig cfg = mlp->config;
     ensure_grad_buffers(mlp, batch_size);
@@ -278,11 +293,9 @@ float mlp_compute_loss_cuda(MLPCuda *mlp, int *d_labels, int batch_size) {
     return loss / batch_size;
 }
 
+// Train the MLP on GPU
 void mlp_train_cuda(MLPCuda *mlp, float *train_data, int *train_labels,
-                    int num_samples, int batch_size, int epochs) {
-    // TODO: Implement GPU training loop
-    // Similar to CPU version but with device memory transfers
-    
+                    int num_samples, int batch_size, int epochs) {    
     printf("Training MLP on GPU...\n");
     
     ensure_io_buffers(mlp, batch_size);
@@ -319,6 +332,7 @@ void mlp_train_cuda(MLPCuda *mlp, float *train_data, int *train_labels,
     }
 }
 
+// Evaluate the MLP on GPU
 float mlp_evaluate_cuda(MLPCuda *mlp, float *test_data, int *test_labels, int num_samples) {
     int batch_size = 256;
     if (num_samples < batch_size) {

@@ -17,7 +17,7 @@ MLP* mlp_create_cpu(MLPConfig config) {
     mlp->b2 = (float*)malloc(config.output_size * sizeof(float));
     
     // Allocate intermediate buffers (sized for max batch)
-    mlp->hidden = NULL;  // Will allocate dynamically based on batch size
+    mlp->hidden = NULL;  
     mlp->output = NULL;
     
     // Allocate gradients
@@ -38,6 +38,7 @@ MLP* mlp_create_cpu(MLPConfig config) {
     return mlp;
 }
 
+// Free CPU memory and destroy MLP
 void mlp_destroy_cpu(MLP *mlp) {
     // Free weights, biases, intermediate values, and gradients
     free(mlp->W1);
@@ -54,6 +55,9 @@ void mlp_destroy_cpu(MLP *mlp) {
     free(mlp);
 }
 
+// ==================== CPU IMPLEMENTATION ====================
+
+// Forward pass on CPU
 void mlp_forward_cpu(MLP *mlp, float *input, int batch_size) {
     // Allocate intermediate buffers if needed
     if (!mlp->hidden) {
@@ -117,6 +121,7 @@ void mlp_forward_cpu(MLP *mlp, float *input, int batch_size) {
     }
 }
 
+// Backward pass on CPU
 void mlp_backward_cpu(MLP *mlp, float *input, int *labels, int batch_size) {
     // Compute output gradient: dL/dz = output - one_hot(labels)
     float *doutput = (float*)malloc(batch_size * mlp->config.output_size * sizeof(float));
@@ -193,6 +198,7 @@ void mlp_backward_cpu(MLP *mlp, float *input, int *labels, int batch_size) {
     free(doutput);
 }
 
+// Update weights using SGD
 void mlp_update_weights_cpu(MLP *mlp) {
     float lr = mlp->config.learning_rate;
     
@@ -219,6 +225,7 @@ void mlp_update_weights_cpu(MLP *mlp) {
     }
 }
 
+// Compute cross-entropy loss
 float mlp_compute_loss_cpu(MLP *mlp, int *labels, int batch_size) {
     float loss = 0.0f;
     
@@ -232,6 +239,7 @@ float mlp_compute_loss_cpu(MLP *mlp, int *labels, int batch_size) {
     return loss / batch_size;
 }
 
+// Predict the class for a single input sample
 int mlp_predict_cpu(MLP *mlp, float *input) {
     mlp_forward_cpu(mlp, input, 1);
     
@@ -247,6 +255,7 @@ int mlp_predict_cpu(MLP *mlp, float *input) {
     return prediction;
 }
 
+// Train the MLP on CPU
 void mlp_train_cpu(MLP *mlp, float *train_data, int *train_labels,
                    int num_samples, int batch_size, int epochs) {
     printf("Training MLP on CPU...\n");
@@ -282,6 +291,7 @@ void mlp_train_cpu(MLP *mlp, float *train_data, int *train_labels,
     }
 }
 
+// Evaluate the MLP on CPU
 float mlp_evaluate_cpu(MLP *mlp, float *test_data, int *test_labels, int num_samples) {
     int correct = 0;
     

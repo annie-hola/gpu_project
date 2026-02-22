@@ -14,6 +14,7 @@
 #define BATCH_SIZE 64
 #define EPOCHS 10
 
+// Function to print usage instructions
 void print_usage(const char *program_name) {
     printf("Usage: %s [OPTIONS]\n", program_name);
     printf("Options:\n");
@@ -28,12 +29,12 @@ void print_usage(const char *program_name) {
 
 int main(int argc, char **argv) {
     // Parse command line arguments
-    char *mode = "both";
+    const char *mode = "both";
     int epochs = EPOCHS;
     int batch_size = BATCH_SIZE;
     int hidden_size = HIDDEN_SIZE;
     float learning_rate = LEARNING_RATE;
-    char *data_dir = "data";
+    const char *data_dir = "data";
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--mode") == 0 && i + 1 < argc) {
@@ -63,12 +64,10 @@ int main(int argc, char **argv) {
     printf("  Learning Rate: %.4f\n", learning_rate);
     printf("  Data Directory: %s\n\n", data_dir);
     
-    // Print GPU information if using GPU
     if (strcmp(mode, "gpu") == 0 || strcmp(mode, "both") == 0) {
         cuda_print_device_info();
     }
     
-    // Load MNIST dataset
     printf("Loading MNIST dataset...\n");
     
     char train_images_path[256], train_labels_path[256];
@@ -129,7 +128,7 @@ int main(int argc, char **argv) {
         
         MLPCuda *mlp_gpu = mlp_create_cuda(config);
         
-        // Initialize weights (same as CPU for fair comparison)
+        // Initialize weights on GPU by copying from a CPU model (for fair comparison)  
         if (strcmp(mode, "both") == 0) {
             MLP *mlp_temp = mlp_create_cpu(config);
             mlp_copy_weights_to_device(mlp_gpu, mlp_temp);

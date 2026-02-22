@@ -22,7 +22,7 @@ __global__ void matmul_kernel(float *A, float *B, float *C, int M, int N, int K)
 
 // Tiled matrix multiplication with shared memory
 __global__ void matmul_tiled_kernel(float *A, float *B, float *C, int M, int N, int K) {
-    // Use __shared__ memory to reduce global memory accesses
+    // We use __shared__ memory to reduce global memory accesses
     
     #define TILE_SIZE 16
     __shared__ float As[TILE_SIZE][TILE_SIZE];
@@ -33,7 +33,6 @@ __global__ void matmul_tiled_kernel(float *A, float *B, float *C, int M, int N, 
     
     float sum = 0.0f;
     
-    // Loop over tiles
     for (int t = 0; t < (K + TILE_SIZE - 1) / TILE_SIZE; t++) {
         int tiled_col = t * TILE_SIZE + threadIdx.x;
         int tiled_row = t * TILE_SIZE + threadIdx.y;
@@ -85,7 +84,7 @@ __global__ void relu_kernel(float *input, float *output, int size) {
 
 // Softmax activation (numerically stable version)
 __global__ void softmax_kernel(float *input, float *output, int batch_size, int num_classes) {
-    // For numerical stability, subtract max before exp
+    // For numerical stability, we subtract max before exp
     
     int batch_idx = blockIdx.x;
     if (batch_idx >= batch_size) return;
@@ -114,7 +113,7 @@ __global__ void softmax_kernel(float *input, float *output, int batch_size, int 
 
 // ==================== BACKWARD PROPAGATION KERNELS ====================
 
-// Softmax + Cross-Entropy gradient (combined for efficiency)
+// Softmax + Cross-Entropy gradient
 __global__ void softmax_cross_entropy_gradient_kernel(float *output, int *labels,
                                                       float *grad_output,
                                                       int batch_size, int num_classes) {
@@ -122,6 +121,7 @@ __global__ void softmax_cross_entropy_gradient_kernel(float *output, int *labels
     int batch_idx = idx / num_classes;
     int class_idx = idx % num_classes;
     
+    float grad = 0.0f; // default gradient 
     if (batch_idx < batch_size && class_idx < num_classes) {
         float grad = output[idx];
         if (class_idx == labels[batch_idx]) {
@@ -158,6 +158,7 @@ __global__ void matmul_transpose_kernel(float *A, float *B, float *C,
     }
 }
 
+// Sum columns of a matrix (used for bias gradient)
 __global__ void sum_columns_kernel(float *input, float *output, int rows, int cols) {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     if (col < cols) {
@@ -185,7 +186,7 @@ __global__ void sgd_update_kernel(float *weights, float *gradients,
 
 // Parallel reduction sum
 __global__ void reduce_sum_kernel(float *input, float *output, int size) {
-    // Use shared memory for efficiency
+    // We use shared memory for efficiency
     
     extern __shared__ float sdata[];
     
@@ -204,13 +205,12 @@ __global__ void reduce_sum_kernel(float *input, float *output, int size) {
         __syncthreads();
     }
     
-    // Write result for this block
     if (tid == 0) {
         output[blockIdx.x] = sdata[0];
     }
 }
 
-// Compute accuracy
+// Accuracy computation
 __global__ void compute_accuracy_kernel(float *predictions, int *labels,
                                         int *correct, int batch_size, int num_classes) {
     int batch_idx = blockIdx.x * blockDim.x + threadIdx.x;

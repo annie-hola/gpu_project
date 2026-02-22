@@ -53,9 +53,7 @@ void cuda_print_device_info() {
 // ==================== RANDOM INITIALIZATION ====================
 
 void initialize_weights_random(float *weights, int size, float scale) {
-    // TODO: Initialize weights with random values
     // Use normal distribution with mean=0, std=scale
-    
     static int seed_initialized = 0;
     if (!seed_initialized) {
         srand(time(NULL));

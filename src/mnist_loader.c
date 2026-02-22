@@ -4,10 +4,16 @@
 #include <stdint.h>
 #include <string.h>
 
+// ==================== MNIST DATA LOADER ====================
+
 // Helper function to read big-endian 32-bit integer
 static uint32_t read_uint32(FILE *fp) {
     uint32_t value;
-    fread(&value, sizeof(uint32_t), 1, fp);
+    size_t result = fread(&value, sizeof(uint32_t), 1, fp);
+    if (result != 1) {
+        fprintf(stderr, "Error: Failed to read uint32 from file\n");
+        return 0;
+    }
     // Convert from big-endian to host byte order
     return __builtin_bswap32(value);
 }
@@ -43,8 +49,16 @@ MNISTDataset* load_mnist_train(const char *images_path, const char *labels_path)
     dataset->images = (float*)malloc(num_images * dataset->image_size * sizeof(float));
     uint8_t *buffer = (uint8_t*)malloc(dataset->image_size);
     
-    for (int i = 0; i < num_images; i++) {
-        fread(buffer, 1, dataset->image_size, images_file);
+    for (uint32_t i = 0; i < num_images; i++) {
+        size_t result = fread(buffer, 1, dataset->image_size, images_file);
+        if (result != dataset->image_size) {
+            fprintf(stderr, "Error: Failed to read image data\n");
+            free(buffer);
+            free(dataset->images);
+            free(dataset);
+            fclose(images_file);
+            return NULL;
+        }
         for (int j = 0; j < dataset->image_size; j++) {
             dataset->images[i * dataset->image_size + j] = (float)buffer[j];
         }
@@ -75,9 +89,18 @@ MNISTDataset* load_mnist_train(const char *images_path, const char *labels_path)
     dataset->labels = (int*)malloc(num_labels * sizeof(int));
     
     uint8_t *label_buffer = (uint8_t*)malloc(num_labels);
-    fread(label_buffer, 1, num_labels, labels_file);
+    size_t result = fread(label_buffer, 1, num_labels, labels_file);
+    if (result != num_labels) {
+        fprintf(stderr, "Error: Failed to read label data\n");
+        free(label_buffer);
+        free(dataset->labels);
+        free(dataset->images);
+        free(dataset);
+        fclose(labels_file);
+        return NULL;
+    }
     
-    for (int i = 0; i < num_labels; i++) {
+    for (uint32_t i = 0; i < num_labels; i++) {
         dataset->labels[i] = (int)label_buffer[i];
     }
     
