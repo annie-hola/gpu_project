@@ -120,16 +120,6 @@ This will verify:
    
    This compiles all CUDA and C source files and creates the executable in `bin/mnist_mlp`.
 
-### Quick Start
-
-After building, run the project with:
-
-```bash
-make run
-```
-
-This will execute training on both CPU and GPU with default settings (10 epochs, batch size 64) and display a performance comparison.
-
 ### Running the Project
 
 #### Run both CPU and GPU training (comparison mode):
@@ -168,76 +158,6 @@ Trains the model using only GPU (CUDA) implementation.
 #### Direct execution with custom arguments:
 ```bash
 ./bin/mnist_mlp --mode both --epochs 20 --batch-size 128 --learning-rate 0.005
-```
-
-## Testing the Project
-
-### Basic Test
-After building, verify the installation works:
-```bash
-make run
-```
-
-Expected output format:
-```
-=== MNIST Digit Classification with MLP ===
-Configuration:
-  Mode: both
-  Epochs: 10
-  Batch Size: 64
-  ...
-
-========== CPU Training ==========
-Epoch 1/10 - Loss: 0.2204 - Time: 29905.88 ms
-...
-CPU Test Accuracy: 97.95%
-
-========== GPU Training ==========
-Epoch 1/10 - Loss: 0.8566 - Time: 283.42 ms
-...
-GPU Test Accuracy: 94.06%
-
-========== Performance Summary ==========
-CPU vs GPU Speedup: ~133x
-```
-
-### Run Comprehensive Benchmarks
-Test performance across different batch sizes:
-```bash
-make benchmark
-```
-
-This runs training with batch sizes of 32, 64, 128, and 256, allowing you to analyze:
-- How batch size affects training speed
-- GPU efficiency at different workload sizes
-- Memory usage patterns
-
-### Verify CUDA Setup
-Check your CUDA installation and GPU availability:
-```bash
-make check-cuda
-```
-
-Expected output:
-```
-Checking CUDA installation...
-nvcc: NVIDIA (R) Cuda compiler driver
-...
-GPU 0: Tesla T4 (Compute Capability 7.5)
-```
-
-### Test Custom Configurations
-Test with different hyperparameters:
-
-```bash
-# Test with larger hidden layer
-./bin/mnist_mlp --mode gpu --hidden-size 512 --epochs 5
-
-# Test with different learning rate
-./bin/mnist_mlp --mode both --learning-rate 0.001 --epochs 10
-
-# Quick test with minimal epochs
-./bin/mnist_mlp --mode gpu --epochs 1 --batch-size 32
 ```
 
 ## Configuration Options
