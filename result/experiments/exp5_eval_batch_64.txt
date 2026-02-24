@@ -1,0 +1,43 @@
+=== MNIST Digit Classification with MLP ===
+Configuration:
+  Mode: gpu
+  Epochs: 5
+  Batch Size: 64
+  Hidden Size: 256
+  Learning Rate: 0.0100
+  Data Directory: data
+
+=== CUDA Device Information ===
+Number of CUDA devices: 1
+
+Device 0: Tesla T4
+  Compute Capability: 7.5
+  Total Global Memory: 15.64 GB
+  Shared Memory per Block: 48.00 KB
+  Max Threads per Block: 1024
+  Multiprocessors: 40
+  Warp Size: 32
+  Memory Clock Rate: 5.00 GHz
+  Memory Bus Width: 256-bit
+===============================
+
+Loading MNIST dataset...
+Loaded 60000 training images
+Loaded 10000 training images
+Training samples: 60000
+Test samples: 10000
+
+
+========== GPU Training ==========
+Training MLP on GPU...
+Epoch 1/5 - Loss: 0.8175 - Time: 300.53 ms
+Epoch 2/5 - Loss: 0.4019 - Time: 223.25 ms
+Epoch 3/5 - Loss: 0.3402 - Time: 218.03 ms
+Epoch 4/5 - Loss: 0.3084 - Time: 216.60 ms
+Epoch 5/5 - Loss: 0.2866 - Time: 218.17 ms
+Total GPU training time: 1176.64 ms (1.18 s)
+
+Evaluating on test set...
+GPU Test Accuracy: 92.37%
+
+Training completed successfully!

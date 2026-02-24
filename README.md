@@ -83,7 +83,7 @@ chmod +x analyze_experiments.sh
 4. **Learning Rate** (0.001, 0.01, 0.1) - Convergence speed & numerical stability
 5. **EVAL_BATCH_SIZE** (64, 256, 512) - Evaluation throughput optimization
 
-Results saved to `result/experiments/` for analysis and report inclusion.
+Results saved to `result/experiments/`
 
 ## Notes
 

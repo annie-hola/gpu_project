@@ -151,10 +151,6 @@ echo "======================================================"
 echo "All experiments completed!"
 echo "Results saved in: $RESULTS_DIR"
 echo ""
-echo "To analyze results:"
-echo "  grep 'GPU Test Accuracy' result/experiments/*.txt"
-echo "  grep 'GPU Training' result/experiments/*.txt | grep 'Loss\\|Time'"
-echo ""
 
 # Restore and rebuild to default state
 make clean > /dev/null 2>&1

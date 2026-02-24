@@ -1,0 +1,63 @@
+=== MNIST Digit Classification with MLP ===
+Configuration:
+  Mode: both
+  Epochs: 5
+  Batch Size: 64
+  Hidden Size: 256
+  Learning Rate: 0.0100
+  Data Directory: data
+
+=== CUDA Device Information ===
+Number of CUDA devices: 1
+
+Device 0: Tesla T4
+  Compute Capability: 7.5
+  Total Global Memory: 15.64 GB
+  Shared Memory per Block: 48.00 KB
+  Max Threads per Block: 1024
+  Multiprocessors: 40
+  Warp Size: 32
+  Memory Clock Rate: 5.00 GHz
+  Memory Bus Width: 256-bit
+===============================
+
+Loading MNIST dataset...
+Loaded 60000 training images
+Loaded 10000 training images
+Training samples: 60000
+Test samples: 10000
+
+
+========== CPU Training ==========
+Training MLP on CPU...
+Epoch 1/5 - Loss: 0.2224 - Time: 32810.53 ms
+Epoch 2/5 - Loss: 0.0920 - Time: 33246.26 ms
+Epoch 3/5 - Loss: 0.0600 - Time: 33293.98 ms
+Epoch 4/5 - Loss: 0.0405 - Time: 32596.87 ms
+Epoch 5/5 - Loss: 0.0279 - Time: 32950.67 ms
+Total CPU training time: 164898.36 ms (164.90 s)
+
+Evaluating on test set...
+CPU Test Accuracy: 97.58%
+
+========== GPU Training ==========
+Training MLP on GPU...
+Epoch 1/5 - Loss: 0.8152 - Time: 298.90 ms
+Epoch 2/5 - Loss: 0.4020 - Time: 219.48 ms
+Epoch 3/5 - Loss: 0.3402 - Time: 217.63 ms
+Epoch 4/5 - Loss: 0.3077 - Time: 215.96 ms
+Epoch 5/5 - Loss: 0.2852 - Time: 216.58 ms
+Total GPU training time: 1168.61 ms (1.17 s)
+
+Evaluating on test set...
+GPU Test Accuracy: 92.54%
+
+========== Performance Summary ==========
+CPU vs GPU speedup calculation requires full implementation.
+Metrics to compare:
+  - Training time per epoch
+  - Total training time
+  - Accuracy convergence
+  - Memory usage
+
+Training completed successfully!

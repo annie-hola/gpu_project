@@ -136,9 +136,3 @@ echo "=========================================="
 # Find best performing configuration overall
 echo "Files in $RESULTS_DIR:"
 ls -la "$RESULTS_DIR" 2>/dev/null | grep -E "exp[0-9]_" || echo "No experiment results found yet."
-
-echo ""
-echo "To integrate results into the report:"
-echo "1. Review the results above"
-echo "2. Update REPORT.tex with key findings"
-echo "3. Highlight performance trends and GPU optimization insights"
