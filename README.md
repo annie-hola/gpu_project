@@ -62,6 +62,29 @@ make run
 | `make check-cuda` | Verify CUDA installation |
 | `make help` | List targets |
 
+## GPU Optimization Experiments
+
+Run systematic experiments to measure GPU tuning impact:
+
+```bash
+# Run all optimization experiments (takes ~30 minutes)
+chmod +x run_experiments.sh
+./run_experiments.sh
+
+# Analyze results
+chmod +x analyze_experiments.sh
+./analyze_experiments.sh
+```
+
+**Experiments included:**
+1. **THREADS_PER_BLOCK_1D** (128, 256, 512) - 1D kernel thread count impact
+2. **THREADS_PER_BLOCK_2D** (8×8, 16×16, 32×32) - Matrix operation block size impact
+3. **Hidden Layer Size** (128, 256, 512, 1024) - Network capacity vs. GPU scalability
+4. **Learning Rate** (0.001, 0.01, 0.1) - Convergence speed & numerical stability
+5. **EVAL_BATCH_SIZE** (64, 256, 512) - Evaluation throughput optimization
+
+Results saved to `result/experiments/` for analysis and report inclusion.
+
 ## Notes
 
 - Default run: 10 epochs, batch size 64, hidden size 256, learning rate 0.01.

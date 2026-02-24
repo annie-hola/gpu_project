@@ -1,5 +1,6 @@
 #include "mlp_cuda.h"
 #include "cuda_kernels.h"
+#include "cuda_constants.h"
 #include "utils.h"
 #include <stdio.h>
 #include <cuda_runtime.h>
@@ -147,7 +148,7 @@ void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
     ensure_activation_buffers(mlp, batch_size);
     
     // Define grid and block dimensions
-    dim3 blockDim(16, 16);
+    dim3 blockDim(THREADS_PER_BLOCK_2D, THREADS_PER_BLOCK_2D);
     dim3 gridDim((cfg.hidden_size + blockDim.x - 1) / blockDim.x,
                  (batch_size + blockDim.y - 1) / blockDim.y);
     
@@ -156,7 +157,7 @@ void mlp_forward_cuda(MLPCuda *mlp, float *d_input, int batch_size) {
                                          batch_size, cfg.hidden_size, cfg.input_size);
 
     int hidden_size = batch_size * cfg.hidden_size;
-    int threads = 256;
+    int threads = THREADS_PER_BLOCK_1D;
     int blocks = (hidden_size + threads - 1) / threads;
     add_bias_kernel<<<blocks, threads>>>(mlp->d_hidden, mlp->d_b1, mlp->d_hidden,
                                          batch_size, cfg.hidden_size);
@@ -186,18 +187,18 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
 
     // 1. Compute output gradient (softmax + cross-entropy derivative)
     int total = batch_size * cfg.output_size;
-    int threads = 256;
+    int threads = THREADS_PER_BLOCK_1D; 
     int blocks = (total + threads - 1) / threads;
     softmax_cross_entropy_gradient_kernel<<<blocks, threads>>>(mlp->d_output, d_labels,
                                                                mlp->d_temp,
                                                                batch_size, cfg.output_size);
 
     // 2. Compute dW2 and db2
-    dim3 blockDim(16, 16);
+    dim3 blockDim(THREADS_PER_BLOCK_2D, THREADS_PER_BLOCK_2D);
     dim3 gridDim((cfg.output_size + blockDim.x - 1) / blockDim.x,
                  (cfg.hidden_size + blockDim.y - 1) / blockDim.y);
     
-    int threads_1d = 256;
+    int threads_1d = THREADS_PER_BLOCK_1D;
     int blocks_1d = (cfg.output_size + threads_1d - 1) / threads_1d;
     
     CUDA_CHECK(cudaMemset(mlp->d_dW2, 0, cfg.hidden_size * cfg.output_size * sizeof(float)));
@@ -244,7 +245,7 @@ void mlp_backward_cuda(MLPCuda *mlp, float *d_input, int *d_labels, int batch_si
 // Update weights using SGD
 void mlp_update_weights_cuda(MLPCuda *mlp, int batch_size) {
     MLPConfig cfg = mlp->config;
-    int threadsPerBlock = 256;
+    int threadsPerBlock = THREADS_PER_BLOCK_1D;
     
     // Update W1
     int numBlocks = (cfg.input_size * cfg.hidden_size + threadsPerBlock - 1) / threadsPerBlock;
@@ -281,7 +282,7 @@ float mlp_compute_loss_cuda(MLPCuda *mlp, int *d_labels, int batch_size) {
     CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
     CUDA_CHECK(cudaMemset(d_loss, 0, sizeof(float)));
 
-    int threads = 256;
+    int threads = THREADS_PER_BLOCK_1D;
     int blocks = (batch_size + threads - 1) / threads;
     cross_entropy_loss_kernel<<<blocks, threads>>>(mlp->d_output, d_labels,
                                                    d_loss,
@@ -334,7 +335,7 @@ void mlp_train_cuda(MLPCuda *mlp, float *train_data, int *train_labels,
 
 // Evaluate the MLP on GPU
 float mlp_evaluate_cuda(MLPCuda *mlp, float *test_data, int *test_labels, int num_samples) {
-    int batch_size = 256;
+    int batch_size = EVAL_BATCH_SIZE;
     if (num_samples < batch_size) {
         batch_size = num_samples;
     }
